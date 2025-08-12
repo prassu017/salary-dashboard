@@ -421,6 +421,119 @@ def show_visualizations(df):
                 title='Top 15 Countries by Average Salary (min 50 records)',
                 labels={'employee_residence': 'Country', 'mean': 'Average Salary (USD)'})
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Demographic Distribution with World Map
+    st.subheader("🗺️ Global Demographic Distribution")
+    
+    # Prepare data for world map
+    country_stats = df.groupby('employee_residence').agg({
+        'salary_in_usd': ['mean', 'count'],
+        'remote_ratio': 'mean',
+        'experience_level': lambda x: x.value_counts().index[0] if len(x) > 0 else 'EN'
+    }).reset_index()
+    
+    country_stats.columns = ['country', 'avg_salary', 'record_count', 'avg_remote_ratio', 'most_common_exp']
+    country_stats = country_stats[country_stats['record_count'] >= 10]  # Filter for meaningful sample sizes
+    
+    # Create world map for salary distribution
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # World map - Average Salary
+        fig = px.choropleth(
+            country_stats,
+            locations='country',
+            locationmode='ISO-3166-1-ALPHA-2',
+            color='avg_salary',
+            hover_name='country',
+            hover_data=['record_count', 'avg_remote_ratio'],
+            title='Global Average Salary Distribution',
+            color_continuous_scale='Viridis',
+            labels={'avg_salary': 'Average Salary (USD)', 'record_count': 'Number of Records'}
+        )
+        fig.update_layout(geo=dict(showframe=False, showcoastlines=True, projection_type='equirectangular'))
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # World map - Remote Work Adoption
+        fig = px.choropleth(
+            country_stats,
+            locations='country',
+            locationmode='ISO-3166-1-ALPHA-2',
+            color='avg_remote_ratio',
+            hover_name='country',
+            hover_data=['avg_salary', 'record_count'],
+            title='Global Remote Work Adoption',
+            color_continuous_scale='RdYlBu',
+            labels={'avg_remote_ratio': 'Remote Work Ratio (%)', 'avg_salary': 'Average Salary (USD)'}
+        )
+        fig.update_layout(geo=dict(showframe=False, showcoastlines=True, projection_type='equirectangular'))
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Regional analysis
+    st.subheader("🌍 Regional Demographic Insights")
+    
+    # Create regional groupings
+    region_mapping = {
+        'US': 'North America', 'CA': 'North America', 'MX': 'North America',
+        'GB': 'Europe', 'DE': 'Europe', 'FR': 'Europe', 'NL': 'Europe', 'ES': 'Europe', 'IT': 'Europe', 'SE': 'Europe', 'CH': 'Europe', 'NO': 'Europe', 'DK': 'Europe', 'FI': 'Europe', 'BE': 'Europe', 'AT': 'Europe', 'IE': 'Europe', 'PL': 'Europe', 'CZ': 'Europe', 'PT': 'Europe', 'HU': 'Europe', 'RO': 'Europe', 'BG': 'Europe', 'HR': 'Europe', 'SI': 'Europe', 'SK': 'Europe', 'LT': 'Europe', 'LV': 'Europe', 'EE': 'Europe', 'LU': 'Europe', 'MT': 'Europe', 'CY': 'Europe', 'GR': 'Europe',
+        'IN': 'Asia', 'CN': 'Asia', 'JP': 'Asia', 'SG': 'Asia', 'AU': 'Asia', 'NZ': 'Asia', 'KR': 'Asia', 'TW': 'Asia', 'HK': 'Asia', 'MY': 'Asia', 'TH': 'Asia', 'VN': 'Asia', 'PH': 'Asia', 'ID': 'Asia', 'PK': 'Asia', 'BD': 'Asia', 'LK': 'Asia', 'NP': 'Asia', 'KH': 'Asia', 'MM': 'Asia', 'LA': 'Asia', 'MN': 'Asia', 'BN': 'Asia', 'TL': 'Asia', 'PG': 'Asia', 'FJ': 'Asia', 'NC': 'Asia', 'PF': 'Asia', 'WS': 'Asia', 'TO': 'Asia', 'VU': 'Asia', 'KI': 'Asia', 'PW': 'Asia', 'MH': 'Asia', 'FM': 'Asia', 'NR': 'Asia', 'TV': 'Asia', 'CK': 'Asia', 'NU': 'Asia', 'TK': 'Asia', 'WF': 'Asia', 'AS': 'Asia', 'GU': 'Asia', 'MP': 'Asia', 'PW': 'Asia', 'MH': 'Asia', 'FM': 'Asia', 'NR': 'Asia', 'TV': 'Asia', 'CK': 'Asia', 'NU': 'Asia', 'TK': 'Asia', 'WF': 'Asia', 'AS': 'Asia', 'GU': 'Asia', 'MP': 'Asia',
+        'BR': 'South America', 'AR': 'South America', 'CL': 'South America', 'CO': 'South America', 'PE': 'South America', 'VE': 'South America', 'EC': 'South America', 'BO': 'South America', 'PY': 'South America', 'UY': 'South America', 'GY': 'South America', 'SR': 'South America', 'GF': 'South America', 'FK': 'South America',
+        'ZA': 'Africa', 'EG': 'Africa', 'NG': 'Africa', 'KE': 'Africa', 'GH': 'Africa', 'ET': 'Africa', 'TZ': 'Africa', 'UG': 'Africa', 'DZ': 'Africa', 'SD': 'Africa', 'MA': 'Africa', 'AO': 'Africa', 'MZ': 'Africa', 'ZW': 'Africa', 'CM': 'Africa', 'CI': 'Africa', 'BF': 'Africa', 'NE': 'Africa', 'MW': 'Africa', 'ML': 'Africa', 'ZM': 'Africa', 'SN': 'Africa', 'TD': 'Africa', 'SO': 'Africa', 'CF': 'Africa', 'RW': 'Africa', 'TG': 'Africa', 'BI': 'Africa', 'SL': 'Africa', 'LY': 'Africa', 'CG': 'Africa', 'CD': 'Africa', 'GA': 'Africa', 'GQ': 'Africa', 'GW': 'Africa', 'DJ': 'Africa', 'ER': 'Africa', 'SS': 'Africa', 'TD': 'Africa', 'NE': 'Africa', 'ML': 'Africa', 'BF': 'Africa', 'CI': 'Africa', 'CM': 'Africa', 'ZW': 'Africa', 'MZ': 'Africa', 'AO': 'Africa', 'MA': 'Africa', 'SD': 'Africa', 'DZ': 'Africa', 'UG': 'Africa', 'TZ': 'Africa', 'ET': 'Africa', 'GH': 'Africa', 'KE': 'Africa', 'NG': 'Africa', 'EG': 'Africa', 'ZA': 'Africa',
+        'IL': 'Middle East', 'AE': 'Middle East', 'SA': 'Middle East', 'TR': 'Middle East', 'QA': 'Middle East', 'KW': 'Middle East', 'BH': 'Middle East', 'OM': 'Middle East', 'JO': 'Middle East', 'LB': 'Middle East', 'SY': 'Middle East', 'IQ': 'Middle East', 'IR': 'Middle East', 'YE': 'Middle East', 'PS': 'Middle East', 'CY': 'Middle East'
+    }
+    
+    df_regional = df.copy()
+    df_regional['region'] = df_regional['employee_residence'].map(region_mapping)
+    df_regional = df_regional.dropna(subset=['region'])
+    
+    regional_stats = df_regional.groupby('region').agg({
+        'salary_in_usd': ['mean', 'count'],
+        'remote_ratio': 'mean',
+        'experience_level': lambda x: x.value_counts().index[0] if len(x) > 0 else 'EN'
+    }).reset_index()
+    
+    regional_stats.columns = ['region', 'avg_salary', 'record_count', 'avg_remote_ratio', 'most_common_exp']
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Regional salary comparison
+        fig = px.bar(regional_stats, x='region', y='avg_salary',
+                    title='Average Salary by Region',
+                    labels={'region': 'Region', 'avg_salary': 'Average Salary (USD)'},
+                    color='avg_salary',
+                    color_continuous_scale='Viridis')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Regional remote work adoption
+        fig = px.bar(regional_stats, x='region', y='avg_remote_ratio',
+                    title='Remote Work Adoption by Region',
+                    labels={'region': 'Region', 'avg_remote_ratio': 'Average Remote Ratio (%)'},
+                    color='avg_remote_ratio',
+                    color_continuous_scale='RdYlBu')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Country-level detailed insights
+    st.subheader("📊 Country-Level Demographic Details")
+    
+    # Show detailed country statistics
+    detailed_country_stats = country_stats.sort_values('avg_salary', ascending=False).head(20)
+    detailed_country_stats['avg_salary_formatted'] = detailed_country_stats['avg_salary'].apply(lambda x: f"${x:,.0f}")
+    detailed_country_stats['avg_remote_ratio_formatted'] = detailed_country_stats['avg_remote_ratio'].apply(lambda x: f"{x:.1f}%")
+    
+    st.write("**Top 20 Countries by Average Salary:**")
+    st.dataframe(
+        detailed_country_stats[['country', 'avg_salary_formatted', 'record_count', 'avg_remote_ratio_formatted', 'most_common_exp']].rename(columns={
+            'country': 'Country',
+            'avg_salary_formatted': 'Average Salary',
+            'record_count': 'Records',
+            'avg_remote_ratio_formatted': 'Remote Work %',
+            'most_common_exp': 'Most Common Level'
+        }),
+        use_container_width=True
+    )
 
 def show_advanced_analytics(df):
     """Advanced analytics and insights"""
