@@ -214,9 +214,12 @@ def show_overview(df):
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        # Experience level distribution
+        # Experience level distribution (EN-MI-SE-EX sequence)
         exp_dist = df['experience_level'].value_counts()
-        fig = px.pie(values=exp_dist.values, names=exp_dist.index, 
+        # Reorder to EN-MI-SE-EX sequence
+        exp_order_list = ['EN', 'MI', 'SE', 'EX']
+        exp_dist_ordered = exp_dist.reindex(exp_order_list)
+        fig = px.pie(values=exp_dist_ordered.values, names=exp_dist_ordered.index, 
                     title='Distribution by Experience Level')
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
@@ -279,8 +282,13 @@ def show_data_explorer(df):
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        # Salary by experience level
+        # Salary by experience level (EN-MI-SE-EX sequence)
         exp_salary = filtered_df.groupby('experience_level')['salary_in_usd'].mean().reset_index()
+        # Sort by EN-MI-SE-EX sequence
+        exp_order = {'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4}
+        exp_salary['exp_order'] = exp_salary['experience_level'].map(exp_order)
+        exp_salary = exp_salary.sort_values('exp_order')
+        
         fig = px.bar(exp_salary, x='experience_level', y='salary_in_usd',
                     title='Average Salary by Experience Level',
                     labels={'experience_level': 'Experience Level', 'salary_in_usd': 'Average Salary (USD)'})
@@ -345,13 +353,18 @@ def show_visualizations(df):
     fig.update_layout(title='Salary Trends by Year', xaxis_title='Year', yaxis_title='Salary (USD)')
     st.plotly_chart(fig, use_container_width=True)
     
-    # Experience level analysis
+    # Experience level analysis (EN-MI-SE-EX sequence)
     st.subheader("👥 Experience Level Analysis")
     
     col1, col2 = st.columns(2)
     
     with col1:
         exp_salary = df.groupby('experience_level')['salary_in_usd'].agg(['mean', 'median', 'count']).reset_index()
+        # Sort by EN-MI-SE-EX sequence
+        exp_order = {'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4}
+        exp_salary['exp_order'] = exp_salary['experience_level'].map(exp_order)
+        exp_salary = exp_salary.sort_values('exp_order')
+        
         fig = px.bar(exp_salary, x='experience_level', y='mean',
                     title='Average Salary by Experience Level',
                     labels={'experience_level': 'Experience Level', 'mean': 'Average Salary (USD)'})
@@ -359,7 +372,10 @@ def show_visualizations(df):
     
     with col2:
         exp_dist = df['experience_level'].value_counts()
-        fig = px.pie(values=exp_dist.values, names=exp_dist.index,
+        # Reorder to EN-MI-SE-EX sequence
+        exp_order_list = ['EN', 'MI', 'SE', 'EX']
+        exp_dist_ordered = exp_dist.reindex(exp_order_list)
+        fig = px.pie(values=exp_dist_ordered.values, names=exp_dist_ordered.index,
                     title='Distribution by Experience Level')
         st.plotly_chart(fig, use_container_width=True)
     
@@ -622,6 +638,222 @@ def show_advanced_analytics(df):
     if len(df) > 50000:
         st.warning("⚠️ Large dataset detected. Some analyses will use sampling for better performance.")
     
+    # Salary Growth Analysis - New Section
+    st.subheader("📈 Salary Growth Analysis")
+    
+    # Query 1: Top 10 job titles by salary growth percentage
+    st.write("**Top 10 Job Titles by Salary Growth Percentage (2020-2025)**")
+    
+    # Calculate salary growth for each job title
+    salary_growth = df.groupby('job_title').agg({
+        'work_year': ['min', 'max'],
+        'salary_in_usd': ['min', 'max', 'count']
+    }).reset_index()
+    
+    salary_growth.columns = ['job_title', 'first_year', 'last_year', 'min_salary', 'max_salary', 'count']
+    
+    # Calculate percentage growth
+    salary_growth['pct_growth'] = ((salary_growth['max_salary'] - salary_growth['min_salary']) * 100.0 / salary_growth['min_salary']).round(2)
+    
+    # Filter for job titles with multiple years and sufficient data
+    salary_growth_filtered = salary_growth[
+        (salary_growth['first_year'] != salary_growth['last_year']) & 
+        (salary_growth['count'] >= 5)  # At least 5 records
+    ].sort_values('pct_growth', ascending=False).head(10)
+    
+    # Display the results
+    st.dataframe(
+        salary_growth_filtered[['job_title', 'first_year', 'last_year', 'pct_growth', 'count']].rename(columns={
+            'job_title': 'Job Title',
+            'first_year': 'First Year',
+            'last_year': 'Last Year', 
+            'pct_growth': 'Growth %',
+            'count': 'Records'
+        }),
+        use_container_width=True
+    )
+    
+    # Visualization for top growth roles
+    fig = px.bar(salary_growth_filtered, x='job_title', y='pct_growth',
+                title='Top 10 Job Titles by Salary Growth Percentage',
+                labels={'job_title': 'Job Title', 'pct_growth': 'Salary Growth (%)'},
+                color='pct_growth',
+                color_continuous_scale='viridis')
+    fig.update_xaxes(tickangle=45)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Query 2: Break down high-growth roles by experience level
+    st.write("**High-Growth Roles Breakdown by Experience Level**")
+    
+    # Get top growth job titles
+    top_growth_titles = salary_growth_filtered['job_title'].tolist()
+    
+    # Filter data for top growth roles and analyze by experience level
+    top_roles_data = df[df['job_title'].isin(top_growth_titles)]
+    
+    # Group by job title and experience level
+    exp_breakdown = top_roles_data.groupby(['job_title', 'experience_level']).agg({
+        'salary_in_usd': ['mean', 'count']
+    }).reset_index()
+    
+    exp_breakdown.columns = ['job_title', 'experience_level', 'avg_salary', 'count']
+    
+    # Sort by job title and experience level (EN-MI-SE-EX sequence)
+    exp_order = {'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4}
+    exp_breakdown['exp_order'] = exp_breakdown['experience_level'].map(exp_order)
+    exp_breakdown = exp_breakdown.sort_values(['job_title', 'exp_order'])
+    
+    # Display the breakdown
+    st.dataframe(
+        exp_breakdown[['job_title', 'experience_level', 'avg_salary', 'count']].rename(columns={
+            'job_title': 'Job Title',
+            'experience_level': 'Experience Level',
+            'avg_salary': 'Avg Salary (USD)',
+            'count': 'Records'
+        }),
+        use_container_width=True
+    )
+    
+    # Visualization for experience level breakdown
+    fig = px.bar(exp_breakdown, x='job_title', y='avg_salary', color='experience_level',
+                title='Salary by Experience Level for High-Growth Roles',
+                labels={'job_title': 'Job Title', 'avg_salary': 'Average Salary (USD)', 'experience_level': 'Experience Level'},
+                barmode='group',
+                color_discrete_map={'EN': '#1f77b4', 'MI': '#ff7f0e', 'SE': '#2ca02c', 'EX': '#d62728'})
+    fig.update_xaxes(tickangle=45)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # US vs Global Analysis
+    st.subheader("🇺🇸 US vs Global Analysis")
+    
+    # US data
+    us_data = df[df['employee_residence'] == 'US']
+    global_data = df[df['employee_residence'] != 'US']
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**US Salary Analysis**")
+        if len(us_data) > 0:
+            us_stats = us_data.groupby('experience_level')['salary_in_usd'].agg(['mean', 'count']).reset_index()
+            us_stats['exp_order'] = us_stats['experience_level'].map(exp_order)
+            us_stats = us_stats.sort_values('exp_order')
+            
+            fig = px.bar(us_stats, x='experience_level', y='mean',
+                        title='US Average Salary by Experience Level',
+                        labels={'experience_level': 'Experience Level', 'mean': 'Average Salary (USD)'},
+                        color='mean',
+                        color_continuous_scale='viridis')
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.write(f"US Records: {len(us_data):,}")
+            st.write(f"US Average Salary: ${us_data['salary_in_usd'].mean():,.0f}")
+        else:
+            st.warning("No US data available")
+    
+    with col2:
+        st.write("**Global (Non-US) Salary Analysis**")
+        if len(global_data) > 0:
+            global_stats = global_data.groupby('experience_level')['salary_in_usd'].agg(['mean', 'count']).reset_index()
+            global_stats['exp_order'] = global_stats['experience_level'].map(exp_order)
+            global_stats = global_stats.sort_values('exp_order')
+            
+            fig = px.bar(global_stats, x='experience_level', y='mean',
+                        title='Global Average Salary by Experience Level',
+                        labels={'experience_level': 'Experience Level', 'mean': 'Average Salary (USD)'},
+                        color='mean',
+                        color_continuous_scale='viridis')
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.write(f"Global Records: {len(global_data):,}")
+            st.write(f"Global Average Salary: ${global_data['salary_in_usd'].mean():,.0f}")
+        else:
+            st.warning("No global data available")
+    
+    # Comparison chart
+    if len(us_data) > 0 and len(global_data) > 0:
+        st.write("**US vs Global Salary Comparison**")
+        
+        # Prepare comparison data
+        us_comp = us_data.groupby('experience_level')['salary_in_usd'].mean().reset_index()
+        us_comp['region'] = 'US'
+        us_comp['exp_order'] = us_comp['experience_level'].map(exp_order)
+        
+        global_comp = global_data.groupby('experience_level')['salary_in_usd'].mean().reset_index()
+        global_comp['region'] = 'Global'
+        global_comp['exp_order'] = global_comp['experience_level'].map(exp_order)
+        
+        comparison_data = pd.concat([us_comp, global_comp]).sort_values(['exp_order', 'region'])
+        
+        fig = px.bar(comparison_data, x='experience_level', y='salary_in_usd', color='region',
+                    title='US vs Global Salary Comparison by Experience Level',
+                    labels={'experience_level': 'Experience Level', 'salary_in_usd': 'Average Salary (USD)', 'region': 'Region'},
+                    barmode='group',
+                    color_discrete_map={'US': '#1f77b4', 'Global': '#ff7f0e'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # World Map for Global Comparison
+    st.subheader("🗺️ Global Salary Distribution")
+    
+    # Prepare country data for world map
+    country_salary = df.groupby('employee_residence').agg({
+        'salary_in_usd': ['mean', 'count'],
+        'experience_level': lambda x: x.value_counts().index[0] if len(x) > 0 else 'EN'
+    }).reset_index()
+    
+    country_salary.columns = ['country', 'avg_salary', 'record_count', 'most_common_exp']
+    country_salary = country_salary[country_salary['record_count'] >= 10]  # Filter for meaningful sample sizes
+    
+    # Create country code to country name mapping
+    country_mapping = {
+        'US': 'United States', 'GB': 'United Kingdom', 'DE': 'Germany', 'FR': 'France', 'NL': 'Netherlands',
+        'ES': 'Spain', 'IT': 'Italy', 'SE': 'Sweden', 'CH': 'Switzerland', 'NO': 'Norway', 'DK': 'Denmark',
+        'FI': 'Finland', 'BE': 'Belgium', 'AT': 'Austria', 'IE': 'Ireland', 'PL': 'Poland', 'CZ': 'Czech Republic',
+        'PT': 'Portugal', 'HU': 'Hungary', 'RO': 'Romania', 'BG': 'Bulgaria', 'HR': 'Croatia', 'SI': 'Slovenia',
+        'SK': 'Slovakia', 'LT': 'Lithuania', 'LV': 'Latvia', 'EE': 'Estonia', 'LU': 'Luxembourg', 'MT': 'Malta',
+        'CY': 'Cyprus', 'GR': 'Greece', 'IN': 'India', 'CN': 'China', 'JP': 'Japan', 'SG': 'Singapore',
+        'AU': 'Australia', 'NZ': 'New Zealand', 'KR': 'South Korea', 'TW': 'Taiwan', 'HK': 'Hong Kong',
+        'MY': 'Malaysia', 'TH': 'Thailand', 'VN': 'Vietnam', 'PH': 'Philippines', 'ID': 'Indonesia',
+        'PK': 'Pakistan', 'BD': 'Bangladesh', 'LK': 'Sri Lanka', 'NP': 'Nepal', 'KH': 'Cambodia',
+        'MM': 'Myanmar', 'LA': 'Laos', 'MN': 'Mongolia', 'BN': 'Brunei', 'TL': 'Timor-Leste',
+        'PG': 'Papua New Guinea', 'FJ': 'Fiji', 'NC': 'New Caledonia', 'PF': 'French Polynesia',
+        'WS': 'Samoa', 'TO': 'Tonga', 'VU': 'Vanuatu', 'KI': 'Kiribati', 'PW': 'Palau', 'MH': 'Marshall Islands',
+        'FM': 'Micronesia', 'NR': 'Nauru', 'TV': 'Tuvalu', 'CK': 'Cook Islands', 'NU': 'Niue',
+        'TK': 'Tokelau', 'WF': 'Wallis and Futuna', 'AS': 'American Samoa', 'GU': 'Guam', 'MP': 'Northern Mariana Islands',
+        'BR': 'Brazil', 'AR': 'Argentina', 'CL': 'Chile', 'CO': 'Colombia', 'PE': 'Peru', 'VE': 'Venezuela',
+        'EC': 'Ecuador', 'BO': 'Bolivia', 'PY': 'Paraguay', 'UY': 'Uruguay', 'GY': 'Guyana', 'SR': 'Suriname',
+        'GF': 'French Guiana', 'FK': 'Falkland Islands', 'ZA': 'South Africa', 'EG': 'Egypt', 'NG': 'Nigeria',
+        'KE': 'Kenya', 'GH': 'Ghana', 'ET': 'Ethiopia', 'TZ': 'Tanzania', 'UG': 'Uganda', 'DZ': 'Algeria',
+        'SD': 'Sudan', 'MA': 'Morocco', 'AO': 'Angola', 'MZ': 'Mozambique', 'ZW': 'Zimbabwe', 'CM': 'Cameroon',
+        'CI': 'Ivory Coast', 'BF': 'Burkina Faso', 'NE': 'Niger', 'MW': 'Malawi', 'ML': 'Mali', 'ZM': 'Zambia',
+        'SN': 'Senegal', 'TD': 'Chad', 'SO': 'Somalia', 'CF': 'Central African Republic', 'RW': 'Rwanda',
+        'TG': 'Togo', 'BI': 'Burundi', 'SL': 'Sierra Leone', 'LY': 'Libya', 'CG': 'Republic of the Congo',
+        'CD': 'Democratic Republic of the Congo', 'GA': 'Gabon', 'GQ': 'Equatorial Guinea', 'GW': 'Guinea-Bissau',
+        'DJ': 'Djibouti', 'ER': 'Eritrea', 'SS': 'South Sudan', 'IL': 'Israel', 'AE': 'United Arab Emirates',
+        'SA': 'Saudi Arabia', 'TR': 'Turkey', 'QA': 'Qatar', 'KW': 'Kuwait', 'BH': 'Bahrain', 'OM': 'Oman',
+        'JO': 'Jordan', 'LB': 'Lebanon', 'SY': 'Syria', 'IQ': 'Iraq', 'IR': 'Iran', 'YE': 'Yemen',
+        'PS': 'Palestine', 'CA': 'Canada', 'MX': 'Mexico'
+    }
+    
+    # Map country codes to full names
+    country_salary['country_name'] = country_salary['country'].map(country_mapping)
+    country_salary = country_salary.dropna(subset=['country_name'])  # Remove unmapped countries
+    
+    # Create world map
+    fig = px.choropleth(
+        country_salary,
+        locations='country_name',
+        locationmode='country names',
+        color='avg_salary',
+        hover_name='country_name',
+        hover_data=['record_count', 'most_common_exp'],
+        title='Global Average Salary Distribution',
+        color_continuous_scale='Viridis',
+        labels={'avg_salary': 'Average Salary (USD)', 'record_count': 'Number of Records'}
+    )
+    fig.update_layout(geo=dict(showframe=False, showcoastlines=True, projection_type='equirectangular'))
+    st.plotly_chart(fig, use_container_width=True)
+    
     # Correlation analysis
     st.subheader("📊 Correlation Analysis")
     
@@ -678,12 +910,16 @@ def show_advanced_analytics(df):
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        # Experience level premium
+        # Experience level premium (EN-MI-SE-EX sequence)
         exp_premium = df.groupby('experience_level')['salary_in_usd'].mean()
         entry_avg = exp_premium['EN']
         exp_premium_pct = ((exp_premium - entry_avg) / entry_avg * 100).round(1)
         
-        fig = px.bar(x=exp_premium.index, y=exp_premium_pct.values,
+        # Reorder to EN-MI-SE-EX sequence
+        exp_order_list = ['EN', 'MI', 'SE', 'EX']
+        exp_premium_pct_ordered = exp_premium_pct.reindex(exp_order_list)
+        
+        fig = px.bar(x=exp_premium_pct_ordered.index, y=exp_premium_pct_ordered.values,
                     title='Salary Premium vs Entry Level (%)',
                     labels={'x': 'Experience Level', 'y': 'Premium (%)'})
         st.plotly_chart(fig, use_container_width=True)
@@ -699,17 +935,26 @@ def show_advanced_analytics(df):
     else:
         df_box_sample = df
     
+    # Sort by EN-MI-SE-EX sequence for box plot
+    exp_order = {'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4}
+    df_box_sample['exp_order'] = df_box_sample['experience_level'].map(exp_order)
+    df_box_sample = df_box_sample.sort_values('exp_order')
+    
     fig = px.box(df_box_sample, x='experience_level', y='salary_in_usd',
                 title='Salary Distribution by Experience Level (with outliers)',
                 labels={'experience_level': 'Experience Level', 'salary_in_usd': 'Salary (USD)'})
     st.plotly_chart(fig, use_container_width=True)
     
-    # Statistical summary
+    # Statistical summary (EN-MI-SE-EX sequence)
     st.subheader("📈 Statistical Summary")
     
     stats_summary = df.groupby('experience_level')['salary_in_usd'].agg([
         'count', 'mean', 'median', 'std', 'min', 'max'
     ]).round(2)
+    
+    # Reorder to EN-MI-SE-EX sequence
+    exp_order_list = ['EN', 'MI', 'SE', 'EX']
+    stats_summary = stats_summary.reindex(exp_order_list)
     
     st.dataframe(stats_summary, use_container_width=True)
     
@@ -719,11 +964,16 @@ def show_advanced_analytics(df):
     col1, col2 = st.columns(2)
     
     with col1:
-        # Remote work by experience level
+        # Remote work by experience level (EN-MI-SE-EX sequence)
         remote_exp = df.groupby(['experience_level', 'remote_ratio'])['salary_in_usd'].mean().reset_index()
         remote_exp['remote_type'] = remote_exp['remote_ratio'].map({
             0: 'On-site', 50: 'Hybrid', 100: 'Remote'
         })
+        
+        # Sort by EN-MI-SE-EX sequence
+        exp_order = {'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4}
+        remote_exp['exp_order'] = remote_exp['experience_level'].map(exp_order)
+        remote_exp = remote_exp.sort_values('exp_order')
         
         fig = px.bar(remote_exp, x='experience_level', y='salary_in_usd', color='remote_type',
                     title='Salary by Experience Level and Remote Work Type',
@@ -757,7 +1007,10 @@ def show_advanced_analytics(df):
         "💡 **Geographic Disparity**: Top-paying countries offer 3x higher salaries than average",
         "💡 **Growth Trend**: Salaries have grown 8% annually since 2020",
         "💡 **Remote by Experience**: Remote work premium varies by experience level",
-        "💡 **Remote by Company Size**: Large companies offer more remote opportunities"
+        "💡 **Remote by Company Size**: Large companies offer more remote opportunities",
+        "💡 **Salary Growth**: Some job titles show exceptional salary growth over time",
+        "💡 **US vs Global**: US salaries are significantly higher than global averages",
+        "💡 **Experience Sequence**: Clear progression from EN to MI to SE to EX levels"
     ]
     
     for insight in insights:
