@@ -854,6 +854,171 @@ def show_advanced_analytics(df):
     fig.update_layout(geo=dict(showframe=False, showcoastlines=True, projection_type='equirectangular'))
     st.plotly_chart(fig, use_container_width=True)
     
+    # Time Series vs Salary Growth Analysis
+    st.subheader("📈 Time Series vs Salary Growth Analysis")
+    
+    # Region-wise Time Series Analysis
+    st.write("**🌍 Region-wise Salary Growth Over Time**")
+    
+    # Define regions
+    region_mapping = {
+        'US': 'North America',
+        'CA': 'North America', 
+        'MX': 'North America',
+        'GB': 'Europe',
+        'DE': 'Europe', 'FR': 'Europe', 'NL': 'Europe', 'ES': 'Europe', 'IT': 'Europe',
+        'SE': 'Europe', 'CH': 'Europe', 'NO': 'Europe', 'DK': 'Europe', 'FI': 'Europe',
+        'BE': 'Europe', 'AT': 'Europe', 'IE': 'Europe', 'PL': 'Europe', 'CZ': 'Europe',
+        'PT': 'Europe', 'HU': 'Europe', 'RO': 'Europe', 'BG': 'Europe', 'HR': 'Europe',
+        'SI': 'Europe', 'SK': 'Europe', 'LT': 'Europe', 'LV': 'Europe', 'EE': 'Europe',
+        'LU': 'Europe', 'MT': 'Europe', 'CY': 'Europe', 'GR': 'Europe',
+        'IN': 'Asia', 'CN': 'Asia', 'JP': 'Asia', 'SG': 'Asia', 'KR': 'Asia', 'TW': 'Asia',
+        'HK': 'Asia', 'MY': 'Asia', 'TH': 'Asia', 'VN': 'Asia', 'PH': 'Asia', 'ID': 'Asia',
+        'PK': 'Asia', 'BD': 'Asia', 'LK': 'Asia', 'NP': 'Asia', 'KH': 'Asia', 'MM': 'Asia',
+        'LA': 'Asia', 'MN': 'Asia', 'BN': 'Asia', 'TL': 'Asia',
+        'AU': 'Oceania', 'NZ': 'Oceania', 'PG': 'Oceania', 'FJ': 'Oceania',
+        'BR': 'South America', 'AR': 'South America', 'CL': 'South America', 'CO': 'South America',
+        'PE': 'South America', 'VE': 'South America', 'EC': 'South America', 'BO': 'South America',
+        'PY': 'South America', 'UY': 'South America', 'GY': 'South America', 'SR': 'South America',
+        'ZA': 'Africa', 'EG': 'Africa', 'NG': 'Africa', 'KE': 'Africa', 'GH': 'Africa',
+        'ET': 'Africa', 'TZ': 'Africa', 'UG': 'Africa', 'DZ': 'Africa', 'SD': 'Africa',
+        'MA': 'Africa', 'AO': 'Africa', 'MZ': 'Africa', 'ZW': 'Africa', 'CM': 'Africa',
+        'CI': 'Africa', 'BF': 'Africa', 'NE': 'Africa', 'MW': 'Africa', 'ML': 'Africa',
+        'ZM': 'Africa', 'SN': 'Africa', 'TD': 'Africa', 'SO': 'Africa', 'CF': 'Africa',
+        'RW': 'Africa', 'TG': 'Africa', 'BI': 'Africa', 'SL': 'Africa', 'LY': 'Africa',
+        'CG': 'Africa', 'CD': 'Africa', 'GA': 'Africa', 'GQ': 'Africa', 'GW': 'Africa',
+        'DJ': 'Africa', 'ER': 'Africa', 'SS': 'Africa'
+    }
+    
+    # Add region column
+    df['region'] = df['employee_residence'].map(region_mapping)
+    df['region'] = df['region'].fillna('Other')
+    
+    # Region-wise time series analysis
+    region_time_series = df.groupby(['region', 'work_year'])['salary_in_usd'].agg(['mean', 'count']).reset_index()
+    region_time_series.columns = ['region', 'year', 'avg_salary', 'count']
+    region_time_series['year'] = region_time_series['year'].dt.year
+    
+    # Filter regions with sufficient data
+    region_counts = df['region'].value_counts()
+    significant_regions = region_counts[region_counts >= 50].index.tolist()
+    
+    # Region slicer
+    st.write("**🎯 Select Regions for Analysis**")
+    selected_regions = st.multiselect(
+        "Choose regions to analyze (default: all regions with sufficient data)",
+        options=significant_regions,
+        default=significant_regions,
+        help="Select specific regions to focus your analysis on"
+    )
+    
+    if selected_regions:
+        region_time_series_filtered = region_time_series[region_time_series['region'].isin(selected_regions)]
+    else:
+        region_time_series_filtered = region_time_series[region_time_series['region'].isin(significant_regions)]
+    
+    if len(region_time_series_filtered) > 0:
+        fig = px.line(region_time_series_filtered, x='year', y='avg_salary', color='region',
+                     title='Salary Growth Trends by Region (2020-2025)',
+                     labels={'year': 'Year', 'avg_salary': 'Average Salary (USD)', 'region': 'Region'},
+                     markers=True)
+        fig.update_layout(xaxis=dict(tickmode='linear', tick0=2020, dtick=1))
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Region growth rates
+        st.write("**📊 Region-wise Salary Growth Rates (2020-2025)**")
+        region_growth = region_time_series_filtered.groupby('region').agg({
+            'avg_salary': ['first', 'last'],
+            'count': 'sum'
+        }).reset_index()
+        region_growth.columns = ['region', 'start_salary', 'end_salary', 'total_records']
+        region_growth['growth_rate'] = ((region_growth['end_salary'] - region_growth['start_salary']) / region_growth['start_salary'] * 100).round(2)
+        region_growth = region_growth.sort_values('growth_rate', ascending=False)
+        
+        st.dataframe(region_growth, use_container_width=True)
+        
+        # Region growth visualization
+        fig = px.bar(region_growth, x='region', y='growth_rate',
+                    title='Salary Growth Rate by Region (%)',
+                    labels={'region': 'Region', 'growth_rate': 'Growth Rate (%)'},
+                    color='growth_rate',
+                    color_continuous_scale='RdYlGn')
+        fig.update_xaxes(tickangle=45)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Country-wise Time Series Analysis
+    st.write("**🌎 Country-wise Salary Growth Over Time**")
+    
+    # Get all available countries for selection
+    all_countries = df['employee_residence'].value_counts().index.tolist()
+    country_names = [country_mapping.get(country, country) for country in all_countries]
+    
+    # Create a mapping for better display
+    country_display_mapping = dict(zip(all_countries, country_names))
+    
+    # Country slicer
+    st.write("**🎯 Select Countries for Analysis**")
+    selected_countries = st.multiselect(
+        "Choose countries to analyze (default: top 15 by record count)",
+        options=all_countries,
+        default=df['employee_residence'].value_counts().head(15).index.tolist(),
+        format_func=lambda x: country_display_mapping.get(x, x)
+    )
+    
+    if selected_countries:
+        # Filter data for selected countries
+        country_time_series = df[df['employee_residence'].isin(selected_countries)].groupby(['employee_residence', 'work_year'])['salary_in_usd'].agg(['mean', 'count']).reset_index()
+        country_time_series.columns = ['country', 'year', 'avg_salary', 'count']
+        country_time_series['year'] = country_time_series['year'].dt.year
+    
+    if selected_countries and len(country_time_series) > 0:
+        # Line chart for selected countries
+        fig = px.line(country_time_series, x='year', y='avg_salary', color='country',
+                     title='Salary Growth Trends by Selected Countries (2020-2025)',
+                     labels={'year': 'Year', 'avg_salary': 'Average Salary (USD)', 'country': 'Country'},
+                     markers=True)
+        fig.update_layout(xaxis=dict(tickmode='linear', tick0=2020, dtick=1))
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Country growth rates
+        st.write("**📊 Country-wise Salary Growth Rates (2020-2025)**")
+        country_growth = country_time_series.groupby('country').agg({
+            'avg_salary': ['first', 'last'],
+            'count': 'sum'
+        }).reset_index()
+        country_growth.columns = ['country', 'start_salary', 'end_salary', 'total_records']
+        country_growth['growth_rate'] = ((country_growth['end_salary'] - country_growth['start_salary']) / country_growth['start_salary'] * 100).round(2)
+        country_growth = country_growth.sort_values('growth_rate', ascending=False)
+        
+        # Add country names for better readability
+        country_growth['country_name'] = country_growth['country'].map(country_mapping)
+        country_growth['country_name'] = country_growth['country_name'].fillna(country_growth['country'])
+        
+        st.dataframe(country_growth[['country_name', 'start_salary', 'end_salary', 'growth_rate', 'total_records']], use_container_width=True)
+        
+        # Top 10 countries by growth rate
+        top_growth_countries = country_growth.head(10)
+        fig = px.bar(top_growth_countries, x='country_name', y='growth_rate',
+                    title='Top 10 Countries by Salary Growth Rate (%)',
+                    labels={'country_name': 'Country', 'growth_rate': 'Growth Rate (%)'},
+                    color='growth_rate',
+                    color_continuous_scale='RdYlGn')
+        fig.update_xaxes(tickangle=45)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Heatmap for country vs year salary trends
+        st.write("**🔥 Salary Heatmap: Selected Countries vs Years**")
+        pivot_data = country_time_series.pivot(index='country', columns='year', values='avg_salary')
+        pivot_data_with_names = pivot_data.copy()
+        pivot_data_with_names.index = pivot_data_with_names.index.map(lambda x: country_mapping.get(x, x))
+        
+        fig = px.imshow(pivot_data_with_names,
+                       title='Salary Heatmap: Selected Countries vs Years',
+                       labels=dict(x='Year', y='Country', color='Average Salary (USD)'),
+                       color_continuous_scale='Viridis',
+                       aspect='auto')
+        st.plotly_chart(fig, use_container_width=True)
+    
     # Correlation analysis
     st.subheader("📊 Correlation Analysis")
     
@@ -888,7 +1053,7 @@ def show_advanced_analytics(df):
     
     fig = px.imshow(correlation_matrix, 
                     title='Correlation Matrix',
-                    color_continuous_scale='RdBu',
+                    color_continuous_scale='Blues',
                     aspect='auto')
     st.plotly_chart(fig, use_container_width=True)
     
@@ -1010,7 +1175,12 @@ def show_advanced_analytics(df):
         "💡 **Remote by Company Size**: Large companies offer more remote opportunities",
         "💡 **Salary Growth**: Some job titles show exceptional salary growth over time",
         "💡 **US vs Global**: US salaries are significantly higher than global averages",
-        "💡 **Experience Sequence**: Clear progression from EN to MI to SE to EX levels"
+        "💡 **Experience Sequence**: Clear progression from EN to MI to SE to EX levels",
+        "💡 **Regional Growth**: Different regions show varying salary growth patterns over time",
+        "💡 **Country Trends**: Top countries exhibit distinct salary evolution trajectories",
+        "💡 **Time Series Analysis**: Salary trends reveal market dynamics and economic shifts",
+        "💡 **Geographic Heatmap**: Visual representation of salary distribution across countries and years",
+        "💡 **Interactive Controls**: Year selection and country filtering for detailed analysis"
     ]
     
     for insight in insights:
