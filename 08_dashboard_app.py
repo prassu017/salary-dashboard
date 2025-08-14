@@ -1203,6 +1203,57 @@ def show_advanced_analytics(df):
                     labels={'company_size_label': 'Company Size', 'salary_in_usd': 'Salary (USD)'})
         st.plotly_chart(fig, use_container_width=True)
     
+    # Employment Type Distribution Pie Chart
+    st.subheader("📊 Employment Type Distribution")
+    
+    # Create employment type distribution
+    emp_type_dist = df['employment_type'].value_counts()
+    
+    # Map employment type codes to readable labels
+    emp_type_mapping = {
+        'FT': 'Full-Time',
+        'PT': 'Part-Time', 
+        'CT': 'Contract',
+        'FL': 'Freelance'
+    }
+    
+    # Create pie chart with readable labels
+    emp_type_dist_labeled = emp_type_dist.copy()
+    emp_type_dist_labeled.index = emp_type_dist_labeled.index.map(emp_type_mapping)
+    
+    # Calculate percentages for display
+    total_records = len(df)
+    emp_type_percentages = (emp_type_dist_labeled / total_records * 100).round(1)
+    
+    # Create pie chart
+    fig = px.pie(
+        values=emp_type_dist_labeled.values,
+        names=emp_type_dist_labeled.index,
+        title='Distribution of Employment Types - Full Dataset',
+        hover_data=[emp_type_percentages],
+        hover_name=emp_type_dist_labeled.index,
+        labels={'value': 'Count', 'percent': 'Percentage'}
+    )
+    
+    # Update hover template to show both count and percentage
+    fig.update_traces(
+        hovertemplate="<b>%{label}</b><br>" +
+                     "Count: %{value:,}<br>" +
+                     "Percentage: %{percent:.1f}%<br>" +
+                     "<extra></extra>"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Display employment type summary
+    st.write("**Employment Type Summary:**")
+    emp_summary = pd.DataFrame({
+        'Employment Type': emp_type_dist_labeled.index,
+        'Count': emp_type_dist_labeled.values,
+        'Percentage': emp_type_percentages.values
+    })
+    st.dataframe(emp_summary, use_container_width=True)
+    
     # Statistical summary (EN-MI-SE-EX sequence)
     st.subheader("📈 Statistical Summary")
     
