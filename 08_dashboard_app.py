@@ -493,7 +493,8 @@ def show_visualizations(df):
     }).reset_index()
     
     country_stats.columns = ['country', 'avg_salary', 'record_count', 'avg_remote_ratio', 'most_common_exp']
-    country_stats = country_stats[country_stats['record_count'] >= 10]  # Filter for meaningful sample sizes
+    # Include all countries regardless of record count to show complete global picture
+    # country_stats = country_stats[country_stats['record_count'] >= 10]  # Commented out to include all data points
     
     # Create country code to country name mapping
     country_mapping = {
@@ -691,8 +692,30 @@ def show_advanced_analytics(df):
     # Filter data for top growth roles and analyze by experience level
     top_roles_data = df[df['job_title'].isin(top_growth_titles)]
     
+    # Country selection for high-growth roles analysis
+    st.write("**🌍 Select Countries for High-Growth Roles Analysis**")
+    
+    # Get available countries from the filtered data
+    available_countries = sorted(top_roles_data['employee_residence'].unique())
+    
+    # Create country selection with "All Countries" option
+    selected_countries_high_growth = st.multiselect(
+        "Choose countries to analyze (default: all countries)",
+        options=available_countries,
+        default=available_countries,
+        help="Select specific countries to focus your high-growth roles analysis on"
+    )
+    
+    # Filter data based on selected countries
+    if selected_countries_high_growth:
+        top_roles_data_filtered = top_roles_data[top_roles_data['employee_residence'].isin(selected_countries_high_growth)]
+        st.info(f"📊 Analyzing {len(top_roles_data_filtered):,} records from {len(selected_countries_high_growth)} selected countries")
+    else:
+        top_roles_data_filtered = top_roles_data
+        st.info(f"📊 Analyzing all {len(top_roles_data_filtered):,} records from all countries")
+    
     # Group by job title and experience level
-    exp_breakdown = top_roles_data.groupby(['job_title', 'experience_level']).agg({
+    exp_breakdown = top_roles_data_filtered.groupby(['job_title', 'experience_level']).agg({
         'salary_in_usd': ['mean', 'count']
     }).reset_index()
     
@@ -716,7 +739,7 @@ def show_advanced_analytics(df):
     
     # Visualization for experience level breakdown
     fig = px.bar(exp_breakdown, x='job_title', y='avg_salary', color='experience_level',
-                title='Salary by Experience Level for High-Growth Roles',
+                title=f'Salary by Experience Level for High-Growth Roles ({len(selected_countries_high_growth) if selected_countries_high_growth else "All"} Countries)',
                 labels={'job_title': 'Job Title', 'avg_salary': 'Average Salary (USD)', 'experience_level': 'Experience Level'},
                 barmode='group',
                 color_discrete_map={'EN': '#1f77b4', 'MI': '#ff7f0e', 'SE': '#2ca02c', 'EX': '#d62728'})
