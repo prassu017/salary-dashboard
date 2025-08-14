@@ -96,6 +96,40 @@ def get_memory_efficient_sample(df, max_rows=50000):
     else:
         return df.sample(n=max_rows, random_state=42)
 
+def create_multiselect_with_select_all(label, options, default=None, help_text=None, key=None):
+    """Create a multiselect with a 'Select All' checkbox"""
+    if default is None:
+        default = options
+    
+    # Create a unique key if not provided
+    if key is None:
+        key = f"multiselect_{label.replace(' ', '_').lower()}"
+    
+    # Add "Select All" option
+    all_options = ["Select All"] + list(options)
+    
+    # Create the multiselect
+    selected = st.multiselect(
+        label,
+        options=all_options,
+        default=default if "Select All" not in default else ["Select All"],
+        help=help_text,
+        key=key
+    )
+    
+    # Handle "Select All" logic
+    if "Select All" in selected:
+        if len(selected) == 1:
+            # Only "Select All" is selected, return all options
+            return list(options)
+        else:
+            # "Select All" + other options selected, remove "Select All"
+            selected.remove("Select All")
+            return selected
+    else:
+        # No "Select All" selected, return selected options
+        return selected
+
 def main():
     # Header
     st.markdown('<h1 class="main-header">📊 Data Science Salary Analysis Dashboard</h1>', unsafe_allow_html=True)
@@ -125,9 +159,8 @@ def main():
         df_clean['work_year'] = pd.to_datetime(df_clean['work_year'], format='%Y')
         st.success(f"📊 Using all {len(df_clean):,} records (all records are valid)")
     
-    # Memory optimization for large datasets
-    if len(df_clean) > 100000:
-        st.warning("⚠️ Large dataset detected (over 100k records). The dashboard will use sampling for memory-intensive operations.")
+    # Full dataset processing
+    st.success("📊 Processing full dataset for comprehensive analysis.")
     
     # Sidebar navigation
     st.sidebar.title("Navigation")
@@ -235,15 +268,15 @@ def show_data_explorer(df):
     
     with col1:
         years = sorted(df['work_year'].dt.year.unique())
-        selected_years = st.multiselect("Select Years", years, default=years)
+        selected_years = create_multiselect_with_select_all("Select Years", years, default=years, key="years_select")
     
     with col2:
         exp_levels = df['experience_level'].unique()
-        selected_exp = st.multiselect("Select Experience Level", exp_levels, default=exp_levels)
+        selected_exp = create_multiselect_with_select_all("Select Experience Level", exp_levels, default=exp_levels, key="exp_select")
     
     with col3:
         emp_types = df['employment_type'].unique()
-        selected_emp = st.multiselect("Select Employment Type", emp_types, default=emp_types)
+        selected_emp = create_multiselect_with_select_all("Select Employment Type", emp_types, default=emp_types, key="emp_select")
     
     # Apply filters
     filtered_df = df[
@@ -635,9 +668,8 @@ def show_advanced_analytics(df):
     """Advanced analytics and insights"""
     st.header("🔍 Advanced Analytics")
     
-    # Memory warning for large datasets
-    if len(df) > 50000:
-        st.warning("⚠️ Large dataset detected. Some analyses will use sampling for better performance.")
+    # Full dataset analysis
+    st.info("📊 Using full dataset for comprehensive analysis.")
     
     # Salary Growth Analysis - New Section
     st.subheader("📈 Salary Growth Analysis")
@@ -698,12 +730,13 @@ def show_advanced_analytics(df):
     # Get available countries from the filtered data
     available_countries = sorted(top_roles_data['employee_residence'].unique())
     
-    # Create country selection with "All Countries" option
-    selected_countries_high_growth = st.multiselect(
+    # Create country selection with "Select All" option
+    selected_countries_high_growth = create_multiselect_with_select_all(
         "Choose countries to analyze (default: all countries)",
-        options=available_countries,
+        available_countries,
         default=available_countries,
-        help="Select specific countries to focus your high-growth roles analysis on"
+        help_text="Select specific countries to focus your high-growth roles analysis on",
+        key="high_growth_countries"
     )
     
     # Filter data based on selected countries
@@ -928,11 +961,12 @@ def show_advanced_analytics(df):
     
     # Region slicer
     st.write("**🎯 Select Regions for Analysis**")
-    selected_regions = st.multiselect(
+    selected_regions = create_multiselect_with_select_all(
         "Choose regions to analyze (default: all regions with sufficient data)",
-        options=significant_regions,
+        significant_regions,
         default=significant_regions,
-        help="Select specific regions to focus your analysis on"
+        help_text="Select specific regions to focus your analysis on",
+        key="regions_select"
     )
     
     if selected_regions:
@@ -981,12 +1015,31 @@ def show_advanced_analytics(df):
     
     # Country slicer
     st.write("**🎯 Select Countries for Analysis**")
+    
+    # For countries with display mapping, we need to handle it differently
+    default_countries = df['employee_residence'].value_counts().head(15).index.tolist()
+    
+    # Add "Select All" option to the display mapping
+    all_countries_with_select_all = ["Select All"] + all_countries
+    country_display_mapping_with_select_all = {"Select All": "Select All"}
+    country_display_mapping_with_select_all.update(country_display_mapping)
+    
     selected_countries = st.multiselect(
         "Choose countries to analyze (default: top 15 by record count)",
-        options=all_countries,
-        default=df['employee_residence'].value_counts().head(15).index.tolist(),
-        format_func=lambda x: country_display_mapping.get(x, x)
+        options=all_countries_with_select_all,
+        default=default_countries,
+        format_func=lambda x: country_display_mapping_with_select_all.get(x, x),
+        key="countries_select"
     )
+    
+    # Handle "Select All" logic for countries
+    if "Select All" in selected_countries:
+        if len(selected_countries) == 1:
+            # Only "Select All" is selected, return all countries
+            selected_countries = all_countries
+        else:
+            # "Select All" + other countries selected, remove "Select All"
+            selected_countries.remove("Select All")
     
     if selected_countries:
         # Filter data for selected countries
@@ -1045,14 +1098,11 @@ def show_advanced_analytics(df):
     # Correlation analysis
     st.subheader("📊 Correlation Analysis")
     
-    # Prepare data for correlation - Memory efficient approach
-    st.info("📊 Computing correlation matrix for large dataset... This may take a moment.")
+    # Prepare data for correlation using full dataset
+    st.info("📊 Computing correlation matrix using full dataset... This may take a moment.")
     
-    # Use a sample of the data for correlation analysis to avoid memory issues
-    sample_size = min(10000, len(df))  # Use max 10k rows or all if smaller
-    df_sample = df.sample(n=sample_size, random_state=42) if len(df) > 10000 else df
-    
-    corr_data = df_sample.copy()
+    # Use the full dataset for correlation analysis
+    corr_data = df.copy()
     corr_data['work_year_num'] = corr_data['work_year'].dt.year
     corr_data['remote_ratio_num'] = corr_data['remote_ratio']
     corr_data['company_size_num'] = corr_data['company_size'].map({'S': 1, 'M': 2, 'L': 3})
@@ -1060,19 +1110,8 @@ def show_advanced_analytics(df):
     
     numeric_cols = ['salary_in_usd', 'work_year_num', 'remote_ratio_num', 'company_size_num', 'experience_level_num']
     
-    # Memory-efficient correlation calculation
-    try:
-        correlation_matrix = corr_data[numeric_cols].corr()
-    except MemoryError:
-        st.warning("⚠️ Memory limit reached. Using a smaller sample for correlation analysis.")
-        # Use an even smaller sample
-        df_small_sample = df.sample(n=5000, random_state=42)
-        corr_data = df_small_sample.copy()
-        corr_data['work_year_num'] = corr_data['work_year'].dt.year
-        corr_data['remote_ratio_num'] = corr_data['remote_ratio']
-        corr_data['company_size_num'] = corr_data['company_size'].map({'S': 1, 'M': 2, 'L': 3})
-        corr_data['experience_level_num'] = corr_data['experience_level'].map({'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4})
-        correlation_matrix = corr_data[numeric_cols].corr()
+    # Calculate correlation matrix using full dataset
+    correlation_matrix = corr_data[numeric_cols].corr()
     
     fig = px.imshow(correlation_matrix, 
                     title='Correlation Matrix',
@@ -1115,21 +1154,16 @@ def show_advanced_analytics(df):
     # Outlier analysis
     st.subheader("📊 Outlier Analysis")
     
-    # Box plot for salary distribution - Memory efficient
-    if len(df) > 20000:
-        # Use sampling for large datasets to avoid memory issues
-        df_box_sample = df.sample(n=20000, random_state=42)
-        st.info("📊 Using a sample of 20,000 records for box plot visualization")
-    else:
-        df_box_sample = df
+    # Box plot for salary distribution using full dataset
+    st.info("📊 Using full dataset for box plot visualization")
     
     # Sort by EN-MI-SE-EX sequence for box plot
     exp_order = {'EN': 1, 'MI': 2, 'SE': 3, 'EX': 4}
-    df_box_sample['exp_order'] = df_box_sample['experience_level'].map(exp_order)
-    df_box_sample = df_box_sample.sort_values('exp_order')
+    df['exp_order'] = df['experience_level'].map(exp_order)
+    df_sorted = df.sort_values('exp_order')
     
-    fig = px.box(df_box_sample, x='experience_level', y='salary_in_usd',
-                title='Salary Distribution by Experience Level (with outliers)',
+    fig = px.box(df_sorted, x='experience_level', y='salary_in_usd',
+                title='Salary Distribution by Experience Level (with outliers) - Full Dataset',
                 labels={'experience_level': 'Experience Level', 'salary_in_usd': 'Salary (USD)'})
     st.plotly_chart(fig, use_container_width=True)
     
@@ -1215,12 +1249,9 @@ def show_machine_learning(df):
     
     st.info("This section provides insights from machine learning models trained on the salary data.")
     
-    # Memory optimization for large datasets
-    if len(df) > 50000:
-        st.warning("⚠️ Using a sample of 50,000 records for machine learning analysis to optimize performance.")
-        ml_data = df.sample(n=50000, random_state=42).copy()
-    else:
-        ml_data = df.copy()
+    # Use full dataset for machine learning analysis
+    st.info("📊 Using full dataset for machine learning analysis to ensure comprehensive insights.")
+    ml_data = df.copy()
     
     # Feature importance (simulated based on correlation)
     st.subheader("🎯 Feature Importance")
