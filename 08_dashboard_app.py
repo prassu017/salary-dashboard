@@ -1167,18 +1167,91 @@ def show_advanced_analytics(df):
                 labels={'experience_level': 'Experience Level', 'salary_in_usd': 'Salary (USD)'})
     st.plotly_chart(fig, use_container_width=True)
     
+    # Additional box plots for employment type and company size
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Box plot for salary vs employment type
+        # Map employment type codes to readable labels
+        df_emp = df.copy()
+        emp_type_mapping = {
+            'FT': 'Full-Time',
+            'PT': 'Part-Time', 
+            'CT': 'Contract',
+            'FL': 'Freelance'
+        }
+        df_emp['employment_type_label'] = df_emp['employment_type'].map(emp_type_mapping)
+        
+        fig = px.box(df_emp, x='employment_type_label', y='salary_in_usd',
+                    title='Salary Distribution by Employment Type - Full Dataset',
+                    labels={'employment_type_label': 'Employment Type', 'salary_in_usd': 'Salary (USD)'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Box plot for salary vs company size
+        # Map company size codes to readable labels
+        df_comp = df.copy()
+        company_size_mapping = {
+            'S': 'Small',
+            'M': 'Medium',
+            'L': 'Large'
+        }
+        df_comp['company_size_label'] = df_comp['company_size'].map(company_size_mapping)
+        
+        fig = px.box(df_comp, x='company_size_label', y='salary_in_usd',
+                    title='Salary Distribution by Company Size - Full Dataset',
+                    labels={'company_size_label': 'Company Size', 'salary_in_usd': 'Salary (USD)'})
+        st.plotly_chart(fig, use_container_width=True)
+    
     # Statistical summary (EN-MI-SE-EX sequence)
     st.subheader("📈 Statistical Summary")
     
-    stats_summary = df.groupby('experience_level')['salary_in_usd'].agg([
-        'count', 'mean', 'median', 'std', 'min', 'max'
-    ]).round(2)
+    col1, col2, col3 = st.columns(3)
     
-    # Reorder to EN-MI-SE-EX sequence
-    exp_order_list = ['EN', 'MI', 'SE', 'EX']
-    stats_summary = stats_summary.reindex(exp_order_list)
+    with col1:
+        st.write("**Experience Level Statistics**")
+        stats_summary_exp = df.groupby('experience_level')['salary_in_usd'].agg([
+            'count', 'mean', 'median', 'std', 'min', 'max'
+        ]).round(2)
+        
+        # Reorder to EN-MI-SE-EX sequence
+        exp_order_list = ['EN', 'MI', 'SE', 'EX']
+        stats_summary_exp = stats_summary_exp.reindex(exp_order_list)
+        
+        st.dataframe(stats_summary_exp, use_container_width=True)
     
-    st.dataframe(stats_summary, use_container_width=True)
+    with col2:
+        st.write("**Employment Type Statistics**")
+        stats_summary_emp = df.groupby('employment_type')['salary_in_usd'].agg([
+            'count', 'mean', 'median', 'std', 'min', 'max'
+        ]).round(2)
+        
+        # Map employment type codes to readable labels
+        emp_type_mapping = {
+            'FT': 'Full-Time',
+            'PT': 'Part-Time', 
+            'CT': 'Contract',
+            'FL': 'Freelance'
+        }
+        stats_summary_emp.index = stats_summary_emp.index.map(emp_type_mapping)
+        
+        st.dataframe(stats_summary_emp, use_container_width=True)
+    
+    with col3:
+        st.write("**Company Size Statistics**")
+        stats_summary_comp = df.groupby('company_size')['salary_in_usd'].agg([
+            'count', 'mean', 'median', 'std', 'min', 'max'
+        ]).round(2)
+        
+        # Map company size codes to readable labels
+        company_size_mapping = {
+            'S': 'Small',
+            'M': 'Medium',
+            'L': 'Large'
+        }
+        stats_summary_comp.index = stats_summary_comp.index.map(company_size_mapping)
+        
+        st.dataframe(stats_summary_comp, use_container_width=True)
     
     # Remote work detailed analysis
     st.subheader("🏠 Remote Work Detailed Analysis")
