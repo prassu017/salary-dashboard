@@ -1198,9 +1198,14 @@ def show_advanced_analytics(df):
         }
         df_comp['company_size_label'] = df_comp['company_size'].map(company_size_mapping)
         
+        # Create the box plot
         fig = px.box(df_comp, x='company_size_label', y='salary_in_usd',
                     title='Salary Distribution by Company Size - Full Dataset',
                     labels={'company_size_label': 'Company Size', 'salary_in_usd': 'Salary (USD)'})
+        
+        # Reorder x-axis to show Large, Medium, Small
+        fig.update_xaxes(categoryorder='array', categoryarray=['Large', 'Medium', 'Small'])
+        
         st.plotly_chart(fig, use_container_width=True)
     
     # Employment Type Distribution Pie Chart
