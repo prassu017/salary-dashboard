@@ -444,6 +444,80 @@ def show_visualizations(df):
                     color_continuous_scale='viridis')
         st.plotly_chart(fig, use_container_width=True)
     
+    # Employee Residence vs Company Location Analysis
+    st.subheader("🌍 Employee Residence vs Company Location Analysis")
+    
+    # Create a summary of employee residence vs company location patterns
+    residence_company = df.groupby(['employee_residence', 'company_location']).agg({
+        'salary_in_usd': 'mean',
+        'remote_ratio': 'mean',
+        'work_year': 'count'
+    }).reset_index()
+    residence_company = residence_company[residence_company['work_year'] >= 5]  # Filter for meaningful sample sizes
+    
+    # Add same country indicator
+    residence_company['same_country'] = residence_company['employee_residence'] == residence_company['company_location']
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Same country vs different country analysis
+        same_country_stats = residence_company.groupby('same_country').agg({
+            'salary_in_usd': 'mean',
+            'remote_ratio': 'mean',
+            'work_year': 'sum'
+        }).reset_index()
+        same_country_stats['work_type'] = same_country_stats['same_country'].map({
+            True: 'Same Country',
+            False: 'Different Country'
+        })
+        
+        fig = px.bar(same_country_stats, x='work_type', y='salary_in_usd',
+                    title='Average Salary: Same vs Different Country',
+                    labels={'work_type': 'Employee vs Company Location', 'salary_in_usd': 'Average Salary (USD)'},
+                    color='work_type',
+                    color_discrete_map={'Same Country': '#2ca02c', 'Different Country': '#d62728'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Remote work adoption by same/different country
+        fig = px.bar(same_country_stats, x='work_type', y='remote_ratio',
+                    title='Remote Work Adoption: Same vs Different Country',
+                    labels={'work_type': 'Employee vs Company Location', 'remote_ratio': 'Average Remote Ratio (%)'},
+                    color='work_type',
+                    color_discrete_map={'Same Country': '#2ca02c', 'Different Country': '#d62728'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Top cross-country employment patterns
+    st.write("**Top Cross-Country Employment Patterns:**")
+    
+    # Find cases where employee and company are in different countries
+    cross_country = residence_company[~residence_company['same_country']].sort_values('work_year', ascending=False).head(15)
+    
+    # Create a heatmap for top cross-country patterns
+    fig = px.scatter(cross_country, x='employee_residence', y='company_location', 
+                    size='work_year', color='salary_in_usd',
+                    hover_data=['remote_ratio'],
+                    title='Top Cross-Country Employment Patterns (Size = Number of Records)',
+                    labels={'employee_residence': 'Employee Residence', 'company_location': 'Company Location', 
+                           'salary_in_usd': 'Average Salary (USD)', 'work_year': 'Number of Records'})
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Detailed cross-country analysis table
+    st.write("**Detailed Cross-Country Employment Analysis:**")
+    cross_country_display = cross_country[['employee_residence', 'company_location', 'salary_in_usd', 'remote_ratio', 'work_year']].copy()
+    cross_country_display['salary_in_usd'] = cross_country_display['salary_in_usd'].round(0)
+    cross_country_display['remote_ratio'] = cross_country_display['remote_ratio'].round(1)
+    cross_country_display = cross_country_display.rename(columns={
+        'employee_residence': 'Employee Residence',
+        'company_location': 'Company Location',
+        'salary_in_usd': 'Avg Salary (USD)',
+        'remote_ratio': 'Remote Ratio (%)',
+        'work_year': 'Records'
+    })
+    st.dataframe(cross_country_display, use_container_width=True)
+    
     # Remote work vs employee residence vs company location
     st.subheader("🌍 Remote Work Geographic Analysis")
     
@@ -460,9 +534,9 @@ def show_visualizations(df):
     
     # Find cases where employee and company are in different countries
     remote_geo['same_country'] = remote_geo['employee_residence'] == remote_geo['company_location']
-    cross_country = remote_geo[~remote_geo['same_country']].sort_values('remote_ratio', ascending=False).head(10)
+    cross_country_remote = remote_geo[~remote_geo['same_country']].sort_values('remote_ratio', ascending=False).head(10)
     
-    fig = px.scatter(cross_country, x='remote_ratio', y='salary_in_usd', 
+    fig = px.scatter(cross_country_remote, x='remote_ratio', y='salary_in_usd', 
                     size='work_year', hover_data=['employee_residence', 'company_location'],
                     title='Remote Work vs Salary: Cross-Country Employment',
                     labels={'remote_ratio': 'Remote Ratio (%)', 'salary_in_usd': 'Average Salary (USD)'})
