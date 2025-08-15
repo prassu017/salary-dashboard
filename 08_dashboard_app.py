@@ -458,6 +458,69 @@ def show_visualizations(df):
     # Add same country indicator
     residence_company['same_country'] = residence_company['employee_residence'] == residence_company['company_location']
     
+    # Create pie chart for same vs different country distribution
+    st.write("**📊 Distribution: Same Country vs Different Country Employment**")
+    
+    # Calculate total records for each category
+    same_country_total = residence_company[residence_company['same_country']]['work_year'].sum()
+    different_country_total = residence_company[~residence_company['same_country']]['work_year'].sum()
+    
+    # Create pie chart data
+    pie_data = pd.DataFrame({
+        'Category': ['Same Country', 'Different Country'],
+        'Count': [same_country_total, different_country_total]
+    })
+    
+    # Calculate percentages
+    total_records = pie_data['Count'].sum()
+    pie_data['Percentage'] = (pie_data['Count'] / total_records * 100).round(1)
+    pie_data['Label'] = pie_data['Category'] + ' (' + pie_data['Percentage'].astype(str) + '%)'
+    
+    # Create pie chart
+    fig = px.pie(
+        pie_data, 
+        values='Count', 
+        names='Label',
+        title='Employee Residence vs Company Location Distribution',
+        color_discrete_map={'Same Country': '#2ca02c', 'Different Country': '#d62728'},
+        hole=0.3  # Create a donut chart for better visual appeal
+    )
+    
+    # Update layout for better appearance
+    fig.update_layout(
+        height=500,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    # Add text annotations for exact numbers
+    fig.add_annotation(
+        x=0.5, y=0.5,
+        text=f"Total: {total_records:,}<br>Records",
+        showarrow=False,
+        font=dict(size=14, color="black")
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Display summary statistics
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Same Country", f"{same_country_total:,}", f"{pie_data.iloc[0]['Percentage']:.1f}%")
+    
+    with col2:
+        st.metric("Different Country", f"{different_country_total:,}", f"{pie_data.iloc[1]['Percentage']:.1f}%")
+    
+    with col3:
+        st.metric("Total Records", f"{total_records:,}", "100%")
+    
     col1, col2 = st.columns(2)
     
     with col1:
